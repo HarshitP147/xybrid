@@ -9,6 +9,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Registry requests and telemetry name the SDK that sent them.** Several
+  paths reported the fallback `rust` instead:
+  - Python always did: the SDK rejected the name `python`. It is accepted now
+    and registered on `import xybrid`, so `xybrid.init()` stays optional.
+  - Flutter did on iOS, macOS, Linux and Windows unless an API key was set,
+    because `Xybrid.init` reached no registering call there.
+    `XybridRustLib.init()` now registers `flutter` on every platform.
+  - Swift and Unity did whenever an app skipped `Xybrid.initialize()` or
+    `XybridClient.Initialize()`, including through the generated constructors.
+    The native library now reports `swift` on Apple platforms and `kotlin` on
+    Android until an SDK registers its own name, and Unity registers from the
+    static constructors of the generated types.
+  - The `xybrid` CLI now reports `cli` instead of `rust`.
+  - The browser SDK (`@xybrid/web`) sent no header at all; it now sends
+    `binding=web` with its version.
+
+  A test now fails if a binding registers a name the SDK would reject.
+- **Unity on Android can load models.** Android has no default model cache
+  folder, and the Unity SDK never set one, so every registry and bundle load
+  failed. It now uses `Application.persistentDataPath/xybrid/models`, unless
+  the app sets its own folder first.
+- **`init_sdk_cache_dir` keeps its first folder entirely.** A later call left
+  the folder alone but still pointed `HF_HOME` and related variables at its
+  own path.
+
+### Deprecated
+
+- **`SdkConfig::with_binding()` and `SdkConfig::binding()`.** No API reads a
+  config's binding, so they never changed what requests report. Use
+  `xybrid_sdk::set_binding` or `xybrid_sdk::init().binding()`.
+
+### Planned
+
+- **Multimodal KV-prefix reuse**: the per-frame prefill cost lever for live vision — **deferred** from 0.2.0, not yet implemented.
+
+---
+
+## [0.10.1] - 2026-09-27
+
+### Fixed
+
+- **Readable llama.cpp output on the iOS Simulator.** Simulator builds now run
+  llama.cpp inference on the CPU. This fixes the invalid special-token output
+  observed in fresh Expo and bare React Native apps with 0.10.0. Physical iOS
+  devices continue to use Metal. The fix was verified with local XCFramework
+  builds in both Expo and bare React Native apps on an iPhone 17 Pro simulator.
+
+---
+
+## [0.10.0] - 2026-09-26
+
+This is the stable release of the React Native, model-cache, pipeline, live
+speech and download-progress work in 0.10.0-rc1. See the release-candidate
+entry below for the full SDK changes.
+
+### Fixed
+
 - **A download survives losing the network for a while.** Once bytes have
   arrived, "network unreachable" errors no longer count against the retry
   budget: the download waits up to two minutes for the connection to return,
@@ -17,9 +74,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Wi-Fi for 10 seconds mid-download). A download that starts offline still
   fails fast.
 
-### Planned
+### Known issues
 
-- **Multimodal KV-prefix reuse**: the per-frame prefill cost lever for live vision — **deferred** from 0.2.0, not yet implemented.
+- In fresh Expo and bare React Native apps, the published rc1 built and loaded
+  a local model on the iOS Simulator, but inference returned invalid special
+  tokens. This was reproduced on an iPhone 17 Pro simulator running iOS 26.5;
+  inference on a physical iPhone was not tested.
 
 ---
 
