@@ -22,8 +22,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     Android until an SDK registers its own name, and Unity registers from the
     static constructors of the generated types.
   - The `xybrid` CLI now reports `cli` instead of `rust`.
+  - The browser SDK (`@xybrid/web`) sent no header at all; it now sends
+    `binding=web` with its version.
 
   A test now fails if a binding registers a name the SDK would reject.
+- **Unity on Android can load models.** Android has no default model cache
+  folder, and the Unity SDK never set one, so every registry and bundle load
+  failed. It now uses `Application.persistentDataPath/xybrid/models`, unless
+  the app sets its own folder first.
+- **`init_sdk_cache_dir` keeps its first folder entirely.** A later call left
+  the folder alone but still pointed `HF_HOME` and related variables at its
+  own path.
+
+### Deprecated
+
+- **`SdkConfig::with_binding()` and `SdkConfig::binding()`.** No API reads a
+  config's binding, so they never changed what requests report. Use
+  `xybrid_sdk::set_binding` or `xybrid_sdk::init().binding()`.
 
 ### Planned
 

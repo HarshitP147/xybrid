@@ -42,7 +42,7 @@ X-Xybrid-Client: binding=flutter; sdk_version=0.10.1; core_version=0.10.1; platf
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `binding` | enum string | The platform binding that made the call. One of `rust`, `cli`, `flutter`, `kotlin`, `python`, `react-native`, `swift`, `unity`. Defaults to `rust` when no binding is registered. |
+| `binding` | enum string | The platform binding that made the call. One of `rust`, `cli`, `flutter`, `kotlin`, `python`, `react-native`, `swift`, `unity`, `web`. Defaults to `rust` when no binding is registered. |
 | `sdk_version` | semver-ish string | `xybrid-sdk` package version, baked in at compile time via `CARGO_PKG_VERSION`. |
 | `core_version` | semver-ish string | `xybrid-core` package version, baked in via the same mechanism. Usually equal to `sdk_version` but reported independently so version skews surface. |
 | `platform` | enum string | Compile-time target triple summary. See the table below. |
@@ -60,6 +60,7 @@ X-Xybrid-Client: binding=flutter; sdk_version=0.10.1; core_version=0.10.1; platf
 | `react-native` | React Native package, wrapping the Swift and Kotlin SDKs. | Every bridged call, before the SDK it wraps (`bindings/react-native/ios/XybridModuleImpl.swift`, `bindings/react-native/android/src/main/java/ai/xybrid/reactnative/XybridModule.kt`) |
 | `swift` | iOS / macOS Swift package via BoltFFI. | `Xybrid.initialize()` (`bindings/apple/Sources/Xybrid/Xybrid.swift`); until then, the native library's Apple-platform fallback, set by any model, download or pipeline constructor (`crates/xybrid-bolt/src/lib.rs`) |
 | `unity` | Unity / C# binding via BoltFFI. | Static constructors on the generated types that reach native code (`bindings/unity/Runtime/BoltSupplement/BindingRegistration.cs`) |
+| `web` | Browser SDK (`@xybrid/web`). It sends only `binding`, `sdk_version` and `platform`, and has no opt-out: browsers have no environment variables. | Every registry resolve request (`bindings/web/src/internal/registry.ts`) |
 
 The first registration in a process wins. The native library's `swift` / `kotlin` fallback on Apple platforms and Android is not a registration: it applies only until an SDK registers, so React Native, Unity and Python report their own names even if a native call ran first.
 
@@ -77,6 +78,7 @@ Any value containing characters outside `[a-z0-9_-]` is replaced with `rust` bef
 | `linux-x86_64` | Linux on x86_64 |
 | `linux-arm64` | Linux on aarch64 |
 | `windows-x86_64` | Windows on x86_64 |
+| `web` | Browser (`@xybrid/web`) |
 | `unknown` | Any target outside the table above |
 
 Source: `xybrid_sdk::current_platform()` (`crates/xybrid-sdk/src/platform.rs`). The string is decided at compile time; switching architectures requires rebuilding.
@@ -145,14 +147,13 @@ Most users never need to think about `binding` — the platform binding sets it 
 xybrid_sdk::set_binding("my-tool");
 ```
 
-The first `set_binding` call wins — once a value is registered, subsequent calls are silent no-ops, matching the lifecycle of "one process, one binding." A second route is the per-config field on [`SdkConfig::with_binding`](../sdk/API_REFERENCE.md#9-configuration-types):
+The first `set_binding` call wins — once a value is registered, subsequent calls are silent no-ops, matching the lifecycle of "one process, one binding." The init builder does the same:
 
 ```rust
-use xybrid_sdk::{SdkConfig, DEFAULT_BINDING};
-
-let config = SdkConfig::default().with_binding("my-tool");
-assert_eq!(config.binding(), "my-tool");
+xybrid_sdk::init().binding("my-tool").run();
 ```
+
+`SdkConfig::with_binding` is deprecated: nothing reads a config's binding, so it never reaches a request.
 
 If your value contains anything outside `[a-z0-9_-]`, the SDK substitutes `rust` before placing the value into the header. There is no way to inject a custom field name; the format is fixed.
 
@@ -164,5 +165,5 @@ Run the CLI command above, or instrument an HTTP proxy in front of the registry 
 
 - [Platform telemetry exporter](../sdk/telemetry.md) — the opt-in exporter for inference events
 - [Resource telemetry](../sdk/resource-telemetry.md) — per-inference resource summaries
-- [API reference](../sdk/API_REFERENCE.md) — full SDK API surface, including `SdkConfig.binding`
+- [API reference](../sdk/API_REFERENCE.md) — full SDK API surface
 - [Feature matrix](../FEATURE_MATRIX.md) — which backend features compile together
