@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Choice scoring in the Rust SDK.** A `ChoiceScorer` model scores a closed
+  list of candidates against one context: build the input with
+  `Envelope::choice_request` and call `run`, `run_with_options` or
+  `run_async`. `InferenceResult::choice_scores()` returns one raw logit and
+  one softmax score per candidate, the caller's choices first, then the
+  scorer's fixed ones. The first kind of scorer is `OnnxByteOptionScorer`, an
+  ONNX model over UTF-8 byte ids; CUA-S1-FORMS matches its PyTorch reference
+  through the SDK within 2e-5 in logits. The executor checks the model against
+  its spec once and keeps that session for later runs, and `warmup()` scores a
+  synthetic request. Telemetry reports the decision task, the backend and the
+  number of candidates, never ids, texts or scores. When ONNX Runtime fails a
+  scorer run, its message is withheld from the error, and so is the shape of a
+  wrong-shaped output, which a model can derive from the request. Scorer
+  sessions and runs set ONNX Runtime's own log level to fatal, so ONNX Runtime
+  logs nothing below fatal for them, such as that message or a warning that
+  quotes what the request produced. Its process-wide logger is not covered; by
+  default it follows `ORT_LOG`. The language bindings still refuse to load a
+  scorer.
 - **EmbeddingGemma 2 runs as a local text-embedding model.** Google's open
   (Apache 2.0) embedding model returns 768-dimensional unit vectors for text
   in over 100 languages and for code. Its ONNX export also declares image,
@@ -48,10 +66,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and only through `run`, `run_with_options` or `run_async`. Every other entry
   point and every other model refuse choice requests and choice scores,
   including inside a multi-part message, conversation history or a pipeline,
-  before any backend or cloud call. Scorers do not run yet: a valid request is
-  refused with `UnsupportedModelCapability`. The bindings refuse to load a
-  choice scorer, and an invalid scorer spec fails the load with
-  `MetadataInvalid`.
+  before any backend or cloud call. The bindings refuse to load a choice
+  scorer, and an invalid scorer spec fails the load with `MetadataInvalid`.
 
 ### Planned
 
