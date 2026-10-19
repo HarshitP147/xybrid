@@ -89,6 +89,13 @@ class Pin:
 def select_pin(target: str, manifest: Path = DEFAULT_MANIFEST) -> Pin:
     require(target in ZIG_TARGETS, "unsupported zzz target")
     data = json_object(manifest.read_bytes(), "engine manifest")
+    # The manifest is public: it pins archives by checksum and names nothing
+    # about where the engine is built. The archive checksum already fixes the
+    # receipt bytes, so a source pin here would add no safety.
+    require(
+        set(data) == {"schema_version", "engine", "release_tag", "archives"},
+        "unexpected engine manifest keys",
+    )
     expect(data, "schema_version", 1, "manifest")
     expect(data, "engine", "zzz", "manifest")
     tag = data.get("release_tag")

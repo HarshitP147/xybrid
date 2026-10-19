@@ -76,8 +76,6 @@ class ZzzPullTests(unittest.TestCase):
                     "system_libraries": entry["system_libraries"],
                     "compiler_runtime": "bundled",
                 },
-                "source_repository": "example/engine-artifacts",
-                "source_commit": "synthetic-test-revision",
             }
         )
         if target == "aarch64-linux-android":
@@ -145,6 +143,19 @@ class ZzzPullTests(unittest.TestCase):
             )
 
         return run
+
+    def test_committed_manifest_carries_only_the_public_keys(self):
+        self.assertEqual(
+            {"schema_version", "engine", "release_tag", "archives"},
+            set(self.manifest_data),
+        )
+
+    def test_manifest_keys_beyond_the_public_four_are_rejected(self):
+        for key in ("source_repository", "source_commit", "notes"):
+            data = dict(self.manifest_data, **{key: "value"})
+            self.manifest.write_text(json.dumps(data))
+            with self.assertRaisesRegex(zzz.StageError, "unexpected engine manifest keys"):
+                zzz.select_pin(self.target, self.manifest)
 
     def test_committed_manifest_has_exactly_three_kitten_targets(self):
         self.assertEqual(
