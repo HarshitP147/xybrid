@@ -654,9 +654,14 @@
           ]
         },
         {
-          "description": "zzz CPU engine execution, pinned Kitten TTS 2 profile, via the\nquietly staged `libzzz_embed.a` (see `crates/zzz-sys`). Model\nweights and both voice JSONs are bundle files resolved like other\ntemplate paths.\n\nDistinct from the ONNX `KittenTTS-Nano` path: the zzz engine links\nthe pinned engine binary (feature `tts-zzz`) and takes the four\nassets directly, without phonemize preprocessing steps.",
+          "description": "Kitten TTS 2 execution through the pinned combined zzz CPU engine and\nquietly staged `libzzz_embed.a` (see `crates/zzz-sys`). Model\nweights and both voice JSONs are bundle files resolved like other\ntemplate paths.\n\nDistinct from the ONNX `KittenTTS-Nano` path: the zzz engine links\nthe pinned engine binary (feature `tts-zzz`) and takes the four\nassets directly, without phonemize preprocessing steps.",
           "type": "object",
           "properties": {
+            "accelerate": {
+              "description": "Accelerate waveform matrix products on macOS only.",
+              "type": "boolean",
+              "default": false
+            },
             "decoder_file": {
               "description": "S3 waveform-decoder GGUF, relative to bundle root.",
               "type": "string",
@@ -680,7 +685,7 @@
               "default": ""
             },
             "max_tokens": {
-              "description": "Generation token cap (0 = engine default of 128; 1..=1023\nexplicit).",
+              "description": "Per-chunk speech token cap (0 = available LM-window room,\nsubject to the split-chunk runaway guard; explicit 1..=1023).",
               "type": "integer",
               "format": "uint32",
               "default": 0,
@@ -697,6 +702,11 @@
               "default": 0,
               "minimum": 0
             },
+            "sentence_chunks": {
+              "description": "Emit each sentence separately; default engine packing stays enabled otherwise.",
+              "type": "boolean",
+              "default": false
+            },
             "threads": {
               "description": "Threads (0 = engine default of 4; explicit range 1..=64).",
               "type": "integer",
@@ -707,6 +717,74 @@
             "type": {
               "type": "string",
               "const": "ZzzEmbed"
+            }
+          },
+          "required": [
+            "type",
+            "model_file"
+          ]
+        },
+        {
+          "description": "Phonon speech from one GGUF using the opt-in zzz CPU engine.\n\nVoices are embedded in the GGUF. Omitted options use native defaults;\ntemperature zero selects the loaded bundle's sampling default.",
+          "type": "object",
+          "properties": {
+            "language": {
+              "description": "Language code; absent selects the engine's English default.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "max_chunk_tokens": {
+              "description": "Positive text-token capacity; absent uses the engine default.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 1
+            },
+            "max_frames_per_chunk": {
+              "description": "Positive per-chunk frame capacity; absent uses the engine default.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 1
+            },
+            "model_file": {
+              "description": "GGUF path relative to the model bundle.",
+              "type": "string"
+            },
+            "seed": {
+              "description": "Utterance seed; zero is valid and absence uses the engine default.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0
+            },
+            "temperature": {
+              "description": "Nonnegative finite sampling temperature; zero selects the bundle default.",
+              "type": [
+                "number",
+                "null"
+              ],
+              "format": "float",
+              "minimum": 0
+            },
+            "type": {
+              "type": "string",
+              "const": "ZzzPhonon"
+            },
+            "voice": {
+              "description": "Bundled voice name; absent lets the engine select its default.",
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           "required": [

@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Phonon speech through the opt-in `tts-zzz` backend.** Load a single GGUF
+  with the `ZzzPhonon` execution template, then use the existing batch and
+  audio-streaming APIs, including async calls, cancellation and resource-abort
+  controls. Voice, language, temperature and seed overrides travel through
+  existing request options. Omitted voices and temperature `0` select the
+  bundle defaults. Sessions remain resident and reusable after cancellation
+  or returned errors. The combined engine archive also preserves Kitten TTS 2;
+  standard prebuilt SDK artifacts continue to require a custom `tts-zzz` build
+  for either model.
+
 - **Choice scoring in the Rust SDK.** A `ChoiceScorer` model scores a closed
   list of candidates against one context: build the input with
   `Envelope::choice_request` and call `run`, `run_with_options` or
@@ -58,6 +68,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ends in `Normalize`.
 
 ### Changed
+
+- **Rust:** `ExecutionTemplate` gains `ZzzPhonon`; exhaustive matches need
+  an additional arm. Existing Kitten bundle metadata remains compatible.
 
 - **Embedding models keep their ONNX session between calls.** The token-ID
   (BERT-style) path built a new session on every call and dropped it: 44 of
