@@ -13,10 +13,10 @@ from pathlib import Path
 from unittest import mock
 
 
-SCRIPTS_DIR = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(SCRIPTS_DIR))
+VERIFIER_DIR = Path(__file__).resolve().parents[3] / "crates/zzz-sys"
+sys.path.insert(0, str(VERIFIER_DIR))
 
-import zzz_pull as zzz  # noqa: E402 (scripts directory must be added first)
+import zzz_pull as zzz  # noqa: E402 (crate verifier directory must be added first)
 
 
 class ZzzPullTests(unittest.TestCase):
@@ -64,7 +64,7 @@ class ZzzPullTests(unittest.TestCase):
         }
         receipt.update(
             {
-                "schema_version": 3,
+                "schema_version": 4,
                 "release_tag": self.manifest_data["release_tag"],
                 "engine_version": self.manifest_data["release_tag"][1:],
                 "abi_version": 1,
@@ -144,6 +144,33 @@ class ZzzPullTests(unittest.TestCase):
 
         return run
 
+    def test_verifier_and_manifest_work_outside_the_workspace(self):
+        package = self.root / "unpacked-crate"
+        package.mkdir()
+        for name in ("zzz_pull.py", "natives-manifest.json"):
+            (package / name).write_bytes((VERIFIER_DIR / name).read_bytes())
+        result = subprocess.run(
+            [sys.executable, "-I", str(package / "zzz_pull.py"), "--help"],
+            cwd=self.root,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(0, result.returncode, result.stderr.decode())
+        archive, _ = self.make_archive()
+        (package / "natives-manifest.json").write_bytes(self.manifest.read_bytes())
+        result = subprocess.run(
+            [
+                sys.executable, "-I", str(package / "zzz_pull.py"),
+                "--target", self.target, "--archive", str(archive),
+                "--dest", str(self.root / "outside-stage"),
+            ],
+            cwd=self.root,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(0, result.returncode, result.stderr.decode())
+        self.assertTrue(Path(result.stdout.decode().strip()).is_dir())
+
     def test_committed_manifest_carries_only_the_public_keys(self):
         self.assertEqual(
             {"schema_version", "engine", "release_tag", "archives"},
@@ -157,20 +184,20 @@ class ZzzPullTests(unittest.TestCase):
             with self.assertRaisesRegex(zzz.StageError, "unexpected engine manifest keys"):
                 zzz.select_pin(self.target, self.manifest)
 
-    def test_committed_manifest_has_exactly_three_combined_targets(self):
+    def test_committed_manifest_has_exactly_three_speech_only_targets(self):
         self.assertEqual(
             set(zzz.ZIG_TARGETS), {e["target"] for e in self.manifest_data["archives"]}
         )
         self.assertEqual(3, len(self.manifest_data["archives"]))
         for target in zzz.ZIG_TARGETS:
             pin = zzz.select_pin(target)
-            self.assertEqual("combined", pin.entry["profile"])
+            self.assertEqual("phonon-kitten-tts2", pin.entry["profile"])
             self.assertEqual(zzz.MODELS, pin.entry["models"])
             self.assertEqual(zzz.APIS, pin.entry["apis"])
             self.assertEqual(zzz.HEADERS, pin.entry["headers"])
 
-    def test_selective_profiles_cannot_substitute_for_combined(self):
-        for profile in ("phonon", "kitten-tts2"):
+    def test_other_profiles_cannot_substitute_for_the_speech_only_profile(self):
+        for profile in ("combined", "phonon", "kitten-tts2"):
             with self.subTest(profile=profile):
                 data = copy.deepcopy(self.manifest_data)
                 for entry in data["archives"]:
@@ -180,11 +207,13 @@ class ZzzPullTests(unittest.TestCase):
                 with self.assertRaisesRegex(zzz.StageError, "target/profile pin"):
                     zzz.select_pin(self.target, self.manifest)
 
-    def test_combined_requires_both_speech_models_and_all_headers(self):
+    def test_speech_only_profile_rejects_other_models_headers_and_apis(self):
         for field, value in (
             ("models", ["phonon"]),
-            ("headers", ["include/zzz_embed.h"]),
-            ("apis", {"zzz_embed": 1}),
+            ("models", ["phonon", "kitten-tts2", "cpu-llm"]),
+            ("headers", ["include/zzz_embed.h", "include/zzz.h"]),
+            ("apis", {"zzz_embed": 1, "zzz": 2}),
+            ("receipt_schema", 3),
         ):
             with self.subTest(field=field):
                 data = copy.deepcopy(self.manifest_data)
@@ -325,8 +354,6 @@ class ZzzPullTests(unittest.TestCase):
         for name in (
             "lib/libzzz_embed.a",
             "include/zzz_embed.h",
-            "include/zzz.h",
-            "include/zzz_engine.h",
             "RECEIPT.json",
             "share/zzz_embed.json",
             zzz.STAGED_ARCHIVE,
